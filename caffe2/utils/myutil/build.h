@@ -1,7 +1,7 @@
 #ifndef BUILD_H
 #define BUILD_H
 
-#include "util/operator.h"
+#include "caffe2/utils/myutil/operator.h"
 
 #include "caffe2/core/net.h"
 #include "caffe2/core/operator_gradient.h"

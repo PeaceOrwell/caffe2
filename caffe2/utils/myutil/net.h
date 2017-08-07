@@ -8,10 +8,10 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-#include "util/image.h"
-#include "util/cuda.h"
-#include "util/print.h"
-#include "util/build.h"
+#include "caffe2/utils/myutil/image.h"
+#include "caffe2/utils/myutil/cuda.h"
+#include "caffe2/utils/myutil/print.h"
+#include "caffe2/utils/myutil/build.h"
 
 namespace caffe2 {
 

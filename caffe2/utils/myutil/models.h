@@ -1,7 +1,7 @@
 #ifndef MODELS_H
 #define MODELS_H
 
-#include "util/build.h"
+#include "caffe2/utils/myutil/build.h"
 
 #ifdef WITH_CURL
   #include <curl/curl.h>
