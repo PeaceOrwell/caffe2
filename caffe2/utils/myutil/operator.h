@@ -236,6 +236,16 @@ OperatorDef *add_relu_op(NetDef &model, const std::string &input, const std::str
   return op;
 }
 
+OperatorDef *add_lrelu_op(NetDef &model, const std::string &input, const std::string &output, const float alpha=0.1) {
+  auto op = add_op(model, "Relu", { input }, { output });
+  add_arg(*op, "alpha", alpha);
+  return op;
+}
+
+OperatorDef *add_spatialBN_op(NetDef &model, const std::string &input, const std::string &output) {
+  
+}
+
 OperatorDef *add_lrn_op(NetDef &model, const std::string &input, const std::string &output, int size, float alpha, float beta, float bias, const std::string &order = "NCHW") {
   auto op = add_op(model, "LRN", { input }, { output, "_" + output + "_scale" });
   add_arg(*op, "size", size);

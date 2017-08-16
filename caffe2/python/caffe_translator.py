@@ -92,10 +92,10 @@ class TranslatorRegistry(object):
                 'only accepts new style layers that are stored in the '
                 'layer field.'
             )
-	input_dims = []	
+	input_dims = []
 	if len(caffe_net.input_shape) > 0:
 		for dim in caffe_net.input_shape[0].dim:
-			input_dims.append(dim)	
+			input_dims.append(dim)
 
         for layer in caffe_net.layer:
             if not _ShouldInclude(net_state, layer):
@@ -134,7 +134,7 @@ def TranslateModel(*args, **kwargs):
     return TranslatorRegistry.TranslateModel(*args, **kwargs)
 
 
-def ConvertTensorProtosToInitNet(net_params, input_name):
+def ConvertTensorProtosToInitNet(net_params, input_name, input_dims):
     """Takes the net_params returned from TranslateModel, and wrap it as an
     init net that contain GivenTensorFill.
 

@@ -209,7 +209,7 @@ OperatorDef *googlenet_add_fc(NetDef &init_model, NetDef &predict_model, const s
 void add_googlenet_model(NetDef &init_model, NetDef &predict_model) {
   predict_model.set_name("GoogleNet");
   auto input = "data";
-  std:string layer = input;
+  std::string layer = input;
   predict_model.add_external_input(layer);
   layer = googlenet_add_first(init_model, predict_model, "1", layer, 3, 64)->output(0);
   layer = googlenet_add_second(init_model, predict_model, "2", layer, 64, 192)->output(0);
@@ -232,6 +232,81 @@ void add_googlenet_model(NetDef &init_model, NetDef &predict_model) {
   add_fill_op(init_model, "ConstantFill", { 1 }, input);
 }
 
+// yolo9000
+OperatorDef *yolo9000_add_conv_ops(NetDef &init_model, NetDef &predict_model, const std::string &prefix, const std::string &input, int in_size, int out_size, int stride, int padding, int kernel, bool group) {
+  auto output = "conv" + prefix;
+  add_fill_op(init_model, "XavierFill", { out_size, in_size, kernel, kernel }, output + "_w");
+  predict_model.add_external_input(output + "_w");
+  add_fill_op(init_model, "ConstantFill", { out_size }, output + "_b");
+  predict_model.add_external_input(output + "_b");
+  auto conv = add_conv_op(predict_model, input, output + "_w", output + "_b", output, stride, padding, kernel);
+  if (group) add_arg(*conv, "group", 2);
+  return conv;
+}
+
+OperatorDef *yolo9000_add_conv_bn_relu(NetDef &init_model, NetDef &predict_model, const std::string &prefix, const std::string &input, int in_size, int out_size, int stride, int padding, int kernel, bool group) {
+  auto output = "conv" + prefix;
+  auto op = yolo9000_add_conv_ops(init_model, predict_model, prefix, input, in_size, out_size, stride, padding, kernel, group);
+  add_spatialBN_op(predict_model, output, output);
+  return add_lrelu_op(predict_model, output, output, 0.1);
+}
+void add_yolo9000_model(NetDef &init_model, NetDef &predict_model, int device_type=0) {
+  predict_model.set_name("yolo9000");
+  auto input = "data";
+  std::string layer = input;
+  predict_model.add_external_input(layer);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "1", layer, 3, 32, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool1", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "2", layer, 32, 64, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool2", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "3", layer, 64, 128, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "4", layer, 128, 64, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "5", layer, 64, 128, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool5", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "6", layer, 128, 256, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "7", layer, 256, 128, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "8", layer, 128, 256, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool8", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "9", layer, 256, 512, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "10", layer, 512, 256, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "11", layer, 256, 512, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "12", layer, 512, 256, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "13", layer, 256, 512, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool13", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "14", layer, 512, 1024, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "15", layer, 1024, 512, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "16", layer, 512, 1024, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "17", layer, 1024, 512, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "18", layer, 512, 1024, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "19", layer, 1024, 1024, 1, 1, 3, false)->output(0);
+
+  layer = add_softmax_op(predict_model, layer, "prob")->output(0);
+  predict_model.add_external_output(layer);
+  add_fill_op(init_model, "ConstantFill", { 1 }, input);
+}
+
+void add_yolo9000_xnor_model(NetDef &init_model, NetDef &predict_model, int device_type=0) {
+  predict_model.set_name("yolo9000_xnor");
+  auto input = "data";
+  std::string layer = input;
+  predict_model.add_external_input(layer);
+
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "1", layer, 3, 32, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool1", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "2", layer, 32, 64, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool2", 2, 0, 2)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "3", layer, 64, 128, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "4", layer, 128, 64, 1, 0, 1, false)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "5", layer, 64, 128, 1, 1, 3, false)->output(0);
+  layer = add_max_pool_op(predict_model, layer, "pool5", 2, 0, 2)->output(0);
+
+  layer = alexnet_add_fc(init_model, predict_model, "6", layer, 9216, 4096, true)->output(0);
+  layer = alexnet_add_fc(init_model, predict_model, "7", layer, 4096, 4096, true)->output(0);
+  layer = alexnet_add_fc(init_model, predict_model, "8", layer, 4096, 1000, false)->output(0);
+  layer = add_softmax_op(predict_model, layer, "prob")->output(0);
+  predict_model.add_external_output(layer);
+  add_fill_op(init_model, "ConstantFill", { 1 }, input);
+  }
 // All
 
 void add_model(const std::string &name, NetDef &init_model, NetDef &predict_model) {
@@ -239,6 +314,10 @@ void add_model(const std::string &name, NetDef &init_model, NetDef &predict_mode
     add_alexnet_model(init_model, predict_model);
   } else if (name == "googlenet") {
     add_googlenet_model(init_model, predict_model);
+  } else if (name == "yolo9000") {
+    add_yolo9000_model(init_model, predict_model);
+  } else if (name == "yolo9000_xnor") {
+    add_yolo9000_xnor_model(init_model, predict_model);
   } else {
     std::cerr << "model " << name << " not implemented";
   }
