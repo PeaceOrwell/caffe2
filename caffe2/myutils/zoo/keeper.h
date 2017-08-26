@@ -4,6 +4,7 @@
 #include "caffe2/myutils/utils/net.h"
 #include "caffe2/myutils/zoo/alexnet.h"
 #include "caffe2/myutils/zoo/googlenet.h"
+#include "caffe2/myutils/zoo/darknet19.h"
 #include "caffe2/myutils/zoo/vgg.h"
 
 #ifdef WITH_CURL
@@ -157,6 +158,8 @@ class Keeper {
       VGGModel(init_model, predict_model).Add(16);
     } else if (name_ == "vgg19") {
       VGGModel(init_model, predict_model).Add(19);
+    } else if (name_ == "darknet19") {
+      Darknet19Model(init_model, predict_model).Add();
     } else {
       std::cerr << "model " << name_ << " not implemented";
     }
