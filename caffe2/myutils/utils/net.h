@@ -54,6 +54,7 @@ class NetUtil {
                          const std::string& b, const std::string& output,
                          int stride, int padding, int kernel);
   OperatorDef* AddReluOp(const std::string& input, const std::string& output);
+  OperatorDef* AddLeakyReluOp(const std::string& input, const std::string& output, float alpha);
   OperatorDef* AddLrnOp(const std::string& input, const std::string& output,
                         int size, float alpha, float beta, float bias,
                         const std::string& order = "NCHW");
@@ -108,7 +109,7 @@ class NetUtil {
                           const std::vector<std::pair<int, int>>& ranges);
   OperatorDef* AddReshapeOp(const std::string& input, const std::string& output,
                             const std::vector<int>& shape);
-
+  OperatorDef* AddBnOp(const std::vector<std::string>& inputs, const std::vector<std::string>& outputs);
   OperatorDef* AddWeightedSumOp(const std::vector<std::string>& inputs,
                                 const std::string& sum);
   OperatorDef* AddSumOp(const std::vector<std::string>& inputs,

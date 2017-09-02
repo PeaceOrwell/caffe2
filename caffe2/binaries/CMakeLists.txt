@@ -11,6 +11,8 @@ caffe2_binary_target("split_db.cc")
 caffe2_binary_target("intro.cpp")
 caffe2_binary_target("toy.cpp")
 caffe2_binary_target("test_yolo9000.cpp")
+caffe2_binary_target("read_pb.cpp")
+caffe2_binary_target("test_op.cpp")
 
 if (USE_CUDA)
   caffe2_binary_target("inspect_gpus.cc")

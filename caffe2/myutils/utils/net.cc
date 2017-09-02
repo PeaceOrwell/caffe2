@@ -21,6 +21,7 @@ const std::set<std::string> trainable_ops({
     "Relu",         "Reshape",
     "Slice",        "Softmax",
     "SpatialBN",    "Sum",
+    "LeakyRelu",
 });
 
 const std::set<std::string> non_trainable_ops({
@@ -279,6 +280,12 @@ OperatorDef* NetUtil::AddReluOp(const std::string& input,
                                 const std::string& output) {
   return AddOp("Relu", {input}, {output});
 }
+OperatorDef* NetUtil::AddLeakyReluOp(const std::string& input,
+                                const std::string& output, float alpha) {
+  auto op =  AddOp("LeakyRelu", {input}, {output});
+  net_add_arg(*op, "alpha", alpha); 
+  return op;
+}
 
 OperatorDef* NetUtil::AddLrnOp(const std::string& input,
                                const std::string& output, int size, float alpha,
@@ -435,6 +442,11 @@ OperatorDef* NetUtil::AddReshapeOp(const std::string& input,
                                    const std::vector<int>& shape) {
   auto op = AddOp("Reshape", {input}, {output, "_"});
   net_add_arg(*op, "shape", shape);
+  return op;
+}
+OperatorDef* NetUtil::AddBnOp(const std::vector<std::string>& inputs,
+                                   const std::vector<std::string>& outputs) {
+  auto op = AddOp("SpatialBN", inputs, outputs);
   return op;
 }
 
@@ -650,7 +662,7 @@ std::vector<std::string> NetUtil::CollectParams() {
   for (const auto& op : net_.op()) {
     if (trainable_ops.find(op.type()) != trainable_ops.end()) {
       for (const auto& input : op.input()) {
-        if (external_inputs.find(input) != external_inputs.end()) {
+        if (external_inputs.find(input) == external_inputs.end()) {
           params.push_back(input);
         }
       }
@@ -672,6 +684,7 @@ std::vector<OperatorDef> NetUtil::CollectGradientOps() {
     }
   }
   std::reverse(gradient_ops.begin(), gradient_ops.end());
+  std::cout << "reversing  ------------------" << std::endl;
   return gradient_ops;
 }
 

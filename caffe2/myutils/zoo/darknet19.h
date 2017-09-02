@@ -28,9 +28,13 @@ class Darknet19Model : public ModelUtil {
     vector<string> bn_inputs({output, output + "_bn_scale_in", output + "_bn_bias_in", output + "_bn_mean", output + "_bn_var"});
     vector<string> bn_outputs({output + "_bn", output + "_bn_mean", output + "_bn_var", output + "_saved_mean", output + "_saved_var"});
     predict_.AddInput(output + "_bn_scale_in");
+    init_.AddXavierFillOp({out_size}, output + "_bn_scale_in");
     predict_.AddInput(output + "_bn_bias_in");
+    init_.AddXavierFillOp({out_size}, output + "_bn_bias_in");
     predict_.AddInput(output + "_bn_mean");
+    init_.AddXavierFillOp({out_size}, output + "_bn_mean");
     predict_.AddInput(output + "_bn_var");
+    init_.AddXavierFillOp({out_size}, output + "_bn_var");
     predict_.AddBnOp(bn_inputs, bn_outputs);
     return predict_.AddLeakyReluOp(output + "_bn", output + "_bn", 0.1);
   }
@@ -46,7 +50,7 @@ class Darknet19Model : public ModelUtil {
     auto op = predict_.AddOp("ConstantFill", {input}, {input + "_grad"});
     auto arg = op->add_arg();
     arg->set_name("value");
-    arg->set_f(1.0);
+    arg->set_f(10000000000.0);
     op->set_is_gradient_op("true");
   }
 
@@ -82,7 +86,7 @@ class Darknet19Model : public ModelUtil {
     layer = AddTrain("1", layer)->output(0);
     AddGradientOp(layer);
     predict_.AddGradientOps();
-    AddIterLrOps(0.1);
+    AddIterLrOps(1);
     string opt = "sgd";
     AddOptimizerOps(opt);
   }
