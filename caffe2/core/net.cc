@@ -145,6 +145,13 @@ bool SimpleNet::Run() {
       LOG(ERROR) << "Operator failed: " << ProtoDebugString(op->debug_def());
       return false;
     }
+    //for (int i = 0; i < op->OutputSize(); ++i) {
+    //  auto* blob = op->OutputBlob(i);
+    //  //std::cout << blob->GetMutable<Tensor<CPUContext>>()->DebugString() << std::endl;
+    //  if (blob->IsType<Tensor<CPUContext>>()) {
+    //    std::cout << blob->GetMutable<Tensor<CPUContext>>()->dims() << std::endl;
+    //  } 
+    //}
   }
   if (observer_) {
     observer_->Stop();

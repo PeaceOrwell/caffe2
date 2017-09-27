@@ -154,7 +154,6 @@ void add_alexnet_model(NetDef &init_model, NetDef &predict_model) {
 }
 
 // GoogleNet
-
 OperatorDef *googlenet_add_conv_ops(NetDef &init_model, NetDef &predict_model, const std::string &input, const std::string &output, int in_size, int out_size, int stride, int padding, int kernel) {
   add_fill_op(init_model, "XavierFill", { out_size, in_size, kernel, kernel }, output + "_w");
   predict_model.add_external_input(output + "_w");
@@ -250,64 +249,68 @@ OperatorDef *yolo9000_add_conv_bn_relu(NetDef &init_model, NetDef &predict_model
   add_spatialBN_op(predict_model, output, output);
   return add_lrelu_op(predict_model, output, output, 0.1);
 }
+OperatorDef *yolo9000_add_max_pool_op(NetDef &init_model, NetDef &predict_model, const std::string &input, const std::string& output, int stride, int padding, int kernel) {
+  return add_max_pool_op(predict_model, input, output, stride, padding, kernel);
+}
+OperatorDef *yolo9000_add_reshape4_op(NetDef &init_model, NetDef &predict_model, const std::string &input, const std::string& output, int dim1, int dim2, int dim3, int dim4) {
+    vector<int> dims;
+    dims.push_back(dim1);
+    dims.push_back(dim2);
+    dims.push_back(dim3);
+    dims.push_back(dim4);
+  return add_reshape_op(predict_model, input, output, dims);
+}
+OperatorDef *yolo9000_add_reshape1_op(NetDef &init_model, NetDef &predict_model, const std::string &input, const std::string& output, int dim) {
+    vector<int> dims;
+    dims.push_back(dim);
+  return add_reshape_op(predict_model, input, output, dims);
+}
+OperatorDef *yolo9000_add_concat_op(NetDef &init_model, NetDef &predict_model, const std::string &input1, const std::string &input2, const std::string& output, int axis) {
+  vector<string> inputs;
+  inputs.push_back(input1);
+  inputs.push_back(input2);
+  return add_concat_op(predict_model, inputs, output);
+}
 void add_yolo9000_model(NetDef &init_model, NetDef &predict_model, int device_type=0) {
   predict_model.set_name("yolo9000");
-  auto input = "data";
+  //predict_model.set_type("dagnet");
+  auto input = "data", label = "label";
   std::string layer = input;
   predict_model.add_external_input(layer);
+  predict_model.add_external_input(label);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "1", layer, 3, 32, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool1", 2, 0, 2)->output(0);
+  layer = yolo9000_add_max_pool_op(init_model, predict_model, layer, "pool1", 2, 0, 2)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "2", layer, 32, 64, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool2", 2, 0, 2)->output(0);
+  layer = yolo9000_add_max_pool_op(init_model, predict_model, layer, "pool2", 2, 0, 2)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "3", layer, 64, 128, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "4", layer, 128, 64, 1, 0, 1, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "5", layer, 64, 128, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool5", 2, 0, 2)->output(0);
+  layer = yolo9000_add_max_pool_op(init_model, predict_model, layer, "pool5", 2, 0, 2)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "6", layer, 128, 256, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "7", layer, 256, 128, 1, 0, 1, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "8", layer, 128, 256, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool8", 2, 0, 2)->output(0);
+  layer = yolo9000_add_max_pool_op(init_model, predict_model, layer, "pool8", 2, 0, 2)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "9", layer, 256, 512, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "10", layer, 512, 256, 1, 0, 1, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "11", layer, 256, 512, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "12", layer, 512, 256, 1, 0, 1, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "13", layer, 256, 512, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool13", 2, 0, 2)->output(0);
+  std::string layer_13 = layer;
+  std::string layer_re13 = yolo9000_add_reshape4_op(init_model, predict_model, layer_13, "reorg", 0, -1, 13, 13)->output(0); 
+  layer = yolo9000_add_max_pool_op(init_model, predict_model, layer, "pool13", 2, 0, 2)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "14", layer, 512, 1024, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "15", layer, 1024, 512, 1, 0, 1, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "16", layer, 512, 1024, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "17", layer, 1024, 512, 1, 0, 1, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "18", layer, 512, 1024, 1, 1, 3, false)->output(0);
   layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "19", layer, 1024, 1024, 1, 1, 3, false)->output(0);
-
-  layer = add_softmax_op(predict_model, layer, "prob")->output(0);
+  layer = yolo9000_add_concat_op(init_model, predict_model, layer, layer_re13, "concat", 1)->output(0);
+  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "20", layer, 3072, 1024, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_conv_ops(init_model, predict_model, "21", layer, 1024, 125, 1, 1, 3, false)->output(0);
+  layer = yolo9000_add_reshape1_op(init_model, predict_model, layer,"regression", 21125)->output(0);
+  //layer = yolo9000_add_loss_op(init_model, predict_model, layer, label, "det_loss")->output(0);
   predict_model.add_external_output(layer);
-  add_fill_op(init_model, "ConstantFill", { 1 }, input);
 }
-
-void add_yolo9000_xnor_model(NetDef &init_model, NetDef &predict_model, int device_type=0) {
-  predict_model.set_name("yolo9000_xnor");
-  auto input = "data";
-  std::string layer = input;
-  predict_model.add_external_input(layer);
-
-  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "1", layer, 3, 32, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool1", 2, 0, 2)->output(0);
-  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "2", layer, 32, 64, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool2", 2, 0, 2)->output(0);
-  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "3", layer, 64, 128, 1, 1, 3, false)->output(0);
-  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "4", layer, 128, 64, 1, 0, 1, false)->output(0);
-  layer = yolo9000_add_conv_bn_relu(init_model, predict_model, "5", layer, 64, 128, 1, 1, 3, false)->output(0);
-  layer = add_max_pool_op(predict_model, layer, "pool5", 2, 0, 2)->output(0);
-
-  layer = alexnet_add_fc(init_model, predict_model, "6", layer, 9216, 4096, true)->output(0);
-  layer = alexnet_add_fc(init_model, predict_model, "7", layer, 4096, 4096, true)->output(0);
-  layer = alexnet_add_fc(init_model, predict_model, "8", layer, 4096, 1000, false)->output(0);
-  layer = add_softmax_op(predict_model, layer, "prob")->output(0);
-  predict_model.add_external_output(layer);
-  add_fill_op(init_model, "ConstantFill", { 1 }, input);
-  }
-// All
 
 void add_model(const std::string &name, NetDef &init_model, NetDef &predict_model) {
   if (name == "alexnet") {
@@ -316,8 +319,6 @@ void add_model(const std::string &name, NetDef &init_model, NetDef &predict_mode
     add_googlenet_model(init_model, predict_model);
   } else if (name == "yolo9000") {
     add_yolo9000_model(init_model, predict_model);
-  } else if (name == "yolo9000_xnor") {
-    add_yolo9000_xnor_model(init_model, predict_model);
   } else {
     std::cerr << "model " << name << " not implemented";
   }

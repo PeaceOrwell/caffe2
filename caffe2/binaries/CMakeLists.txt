@@ -8,11 +8,6 @@ caffe2_binary_target("print_registered_core_operators.cc")
 caffe2_binary_target("run_plan.cc")
 caffe2_binary_target("speed_benchmark.cc")
 caffe2_binary_target("split_db.cc")
-caffe2_binary_target("intro.cpp")
-caffe2_binary_target("toy.cpp")
-caffe2_binary_target("test_yolo9000.cpp")
-caffe2_binary_target("read_pb.cpp")
-caffe2_binary_target("test_op.cpp")
 
 if (USE_CUDA)
   caffe2_binary_target("inspect_gpus.cc")
@@ -37,3 +32,13 @@ endif()
 
 # ---[ tutorials
 caffe2_binary_target("tutorial_blob.cc")
+
+# ---[ yolo9000
+caffe2_binary_target("train_darknet19.cpp")
+caffe2_binary_target("toy.cpp")
+caffe2_binary_target("test_yolo9000.cpp")
+caffe2_binary_target("read_pb.cpp")
+caffe2_binary_target("intro.cpp")
+caffe2_binary_target("test_op.cpp")
+
+

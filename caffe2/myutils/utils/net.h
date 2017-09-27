@@ -28,6 +28,15 @@ class NetUtil {
                                     const std::string& output);
   OperatorDef* AddCopyFromCpuInputOp(const std::string& input,
                                      const std::string& output);
+  OperatorDef* AddCopyCpuToGpuOp(const std::string& input,
+                                     const std::string& output);
+  OperatorDef* AddCopyGpuToCpuOp(const std::string& input,
+                                     const std::string& output);
+  OperatorDef* AddNHWC2NCHWOp(const std::string& input,
+                                     const std::string& output);
+  OperatorDef* AddNCHW2NHWCOp(const std::string& input,
+                                     const std::string& output);
+
   OperatorDef* AddCopyOp(const std::string& input, const std::string& output);
   OperatorDef* AddCreateMutexOp(const std::string& param);
   OperatorDef* AddPrintOp(const std::string& param, bool to_file = false);

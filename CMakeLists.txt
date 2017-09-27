@@ -67,6 +67,7 @@ set(CAFFE2_WHITELIST "" CACHE STRING "A whitelist file of files that one should 
 if(NOT CMAKE_BUILD_TYPE)
     message(STATUS "Build type not set - defaulting to Release")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build from: Debug Release RelWithDebInfo MinSizeRel Coverage." FORCE)
+    #set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build from: Debug Release RelWithDebInfo MinSizeRel Coverage." FORCE)
 endif()
 
 # ---[ Dependencies

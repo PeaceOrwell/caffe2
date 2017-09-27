@@ -50,14 +50,17 @@ class Darknet19Model : public ModelUtil {
     auto op = predict_.AddOp("ConstantFill", {input}, {input + "_grad"});
     auto arg = op->add_arg();
     arg->set_name("value");
-    arg->set_f(10000000000.0);
+    arg->set_f(10.0);
     op->set_is_gradient_op("true");
   }
 
   void Add(int out_size = 1000) {
     predict_.SetName("Darknet19");
-    string layer = "data";
-    predict_.AddInput("data");
+    string layer = "dbreader";
+    string db_path = "/data/zhouys/imagenet/ILSVRC/Data/CLS-LOC/test_dataset6", db_type = "lmdb";
+    predict_.AddCreateDbOp(layer, db_type, db_path);
+    predict_.AddTensorProtosDbInputOp(layer, "data", "label", 96);
+    layer = "data";
     layer = AddConvBnRelu("1", layer, 3, 32, 3, 1, 1)->output(0);
     layer = predict_.AddMaxPoolOp(layer, "pool1", 2, 0 ,2)->output(0); 
     layer = AddConvBnRelu("2", layer, 32, 64, 3, 1, 1)->output(0);
@@ -83,10 +86,14 @@ class Darknet19Model : public ModelUtil {
     layer = AddConvBnRelu("18", layer, 512, 1024, 3, 1, 1)->output(0);
     layer = AddConvBnRelu("19", layer, 1024, 1000, 1, 0, 1)->output(0);
     layer = predict_.AddAveragePoolOp(layer, "pool19", 7, 0, 7)->output(0); 
+    layer = predict_.AddReshapeOp(layer, layer + "_reshape", {0, 0})->output(0);
     layer = AddTrain("1", layer)->output(0);
-    AddGradientOp(layer);
+    //AddGradientOp(layer);
+    predict_.AddCopyOp(layer, layer + "_grad");
     predict_.AddGradientOps();
-    AddIterLrOps(1);
+    predict_.SetDeviceCUDA();
+    init_.SetDeviceCUDA();
+    AddIterLrOps(0.1);
     string opt = "sgd";
     AddOptimizerOps(opt);
   }

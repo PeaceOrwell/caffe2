@@ -1,9 +1,7 @@
 #include "caffe2/myutils/utils/blob.h"
 #include "caffe2/myutils/utils/tensor.h"
 
-#ifdef WITH_CUDA
 #include "caffe2/core/context_gpu.h"
-#endif
 
 namespace caffe2 {
 

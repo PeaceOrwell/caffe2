@@ -115,8 +115,9 @@ void print(const Tensor<C> &tensor, const std::string &name = "", int max = 100)
   std::cout << name << "?" << std::endl;
 }
 
+template <typename Context=CPUContext>
 void print(const Blob &blob, const std::string &name = "") {
-  print(blob.Get<Tensor<CPUContext>>(), name);
+  print(blob.Get<Tensor<Context>>(), name);
 }
 
 template<typename C>

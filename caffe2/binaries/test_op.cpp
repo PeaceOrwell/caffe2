@@ -1,4 +1,7 @@
 #include "caffe2/core/init.h"
+#include "caffe2/core/context_gpu.h"
+#include "caffe2/core/common_gpu.h"
+#include "caffe2/core/common_cudnn.h"
 #include "caffe2/core/operator_gradient.h"
 
 #include "caffe2/utils/myutil/print.h"
@@ -8,12 +11,16 @@ namespace caffe2 {
 
 void run() {
   Workspace workspace;
+  DeviceOption option;
+  option.set_device_type(CUDA);
+  option.set_cuda_gpu_id(0);
+  CUDAContext* context = new CUDAContext(option);
 
-  std::vector<float> data(5);
+  std::vector<float> data(2);
   for (auto& v: data) {
-    v = 100.0;
+    v = 0.0;
   }
-  std::vector<float> data_grad(5);
+  std::vector<float> data_grad(2);
   for (auto& v: data_grad) {
     v = 10.0;
   }
@@ -24,26 +31,27 @@ void run() {
   }
 
   {
-    auto tensor = workspace.CreateBlob("data")->GetMutable<TensorCPU>();
-    auto value = TensorCPU({5}, data, NULL);
+    auto tensor = workspace.CreateBlob("data")->GetMutable<TensorCUDA>();
+    auto value = TensorCUDA({2}, data, context);
+    tensor->ResizeLike(value);
+    tensor->ShareData(value);
+  }
+  
+  {
+    auto tensor = workspace.CreateBlob("one")->GetMutable<TensorCUDA>();
+    auto value = TensorCUDA({1}, one, context);
     tensor->ResizeLike(value);
     tensor->ShareData(value);
   }
   {
-    auto tensor = workspace.CreateBlob("one")->GetMutable<TensorCPU>();
-    auto value = TensorCPU({1}, one, NULL);
+    auto tensor = workspace.CreateBlob("lr")->GetMutable<TensorCUDA>();
+    auto value = TensorCUDA({1}, one, context);
     tensor->ResizeLike(value);
     tensor->ShareData(value);
   }
   {
-    auto tensor = workspace.CreateBlob("lr")->GetMutable<TensorCPU>();
-    auto value = TensorCPU({1}, one, NULL);
-    tensor->ResizeLike(value);
-    tensor->ShareData(value);
-  }
-  {
-    auto tensor = workspace.CreateBlob("data_grad")->GetMutable<TensorCPU>();
-    auto value = TensorCPU({5}, data_grad, NULL);
+    auto tensor = workspace.CreateBlob("data_grad")->GetMutable<TensorCUDA>();
+    auto value = TensorCUDA({2}, data_grad, context);
     tensor->ResizeLike(value);
     tensor->ShareData(value);
   }
@@ -52,13 +60,14 @@ void run() {
 
   NetUtil* net_util = new NetUtil(predictModel);
   net_util->AddWeightedSumOp({"data", "one", "data_grad", "lr"}, {"data"});
+  net_util->SetDeviceCUDA();
   net_util->Print();
 
 
   auto predictNet = CreateNet(predictModel, &workspace);
-  for (int i = 0 ; i < 10; ++i) {
+  for (int i = 0 ; i < 100; ++i) {
     predictNet->Run();
-    print(*(workspace.GetBlob("data")));
+    print(Tensor<CPUContext>((workspace.GetBlob("data")->Get<Tensor<CUDAContext>>())));
     std::cout << std::endl;
   }
 }

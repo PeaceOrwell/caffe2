@@ -1,8 +1,6 @@
 #include "caffe2/myutils/utils/net.h"
 
-#ifdef WITH_CUDA
 #include "caffe2/core/context_gpu.h"
-#endif
 
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/text_format.h"
@@ -166,6 +164,19 @@ OperatorDef* NetUtil::AddCopyFromCpuInputOp(const std::string& input,
                                             const std::string& output) {
   return AddOp("CopyFromCPUInput", {input}, {output});
 }
+OperatorDef* NetUtil::AddCopyCpuToGpuOp(const std::string& input,
+                                            const std::string& output) {
+  return AddOp("CopyCPUToGPU", {input}, {output});
+}
+OperatorDef* NetUtil::AddCopyGpuToCpuOp(const std::string& input,
+                                            const std::string& output) {
+  return AddOp("CopyGPUToCPU", {input}, {output});
+}
+OperatorDef* NetUtil::AddNHWC2NCHWOp(const std::string& input,
+                                const std::string& output) {
+  return AddOp("NHWC2NCHW", {input}, {output});
+}
+
 
 OperatorDef* NetUtil::AddCopyOp(const std::string& input,
                                 const std::string& output) {
@@ -544,7 +555,7 @@ OperatorDef* NetUtil::AddLearningRateOp(const std::string& iter,
                                         float base_rate, float gamma) {
   auto op = AddOp("LearningRate", {iter}, {rate});
   net_add_arg(*op, "policy", "step");
-  net_add_arg(*op, "stepsize", 1);
+  net_add_arg(*op, "stepsize", 100);
   net_add_arg(*op, "base_lr", -base_rate);
   net_add_arg(*op, "gamma", gamma);
   return op;
@@ -659,10 +670,11 @@ std::vector<std::string> NetUtil::CollectParams() {
   std::vector<std::string> params;
   std::set<std::string> external_inputs(net_.external_input().begin(),
                                         net_.external_input().end());
+  std::set<std::string> non_train_inputs({"label", "one", "lr", "data"});
   for (const auto& op : net_.op()) {
     if (trainable_ops.find(op.type()) != trainable_ops.end()) {
       for (const auto& input : op.input()) {
-        if (external_inputs.find(input) == external_inputs.end()) {
+        if (external_inputs.find(input) != external_inputs.end() && non_train_inputs.find(input) == non_train_inputs.end() && input.find("_mean") == std::string::npos && input.find("_var") == std::string::npos) {
           params.push_back(input);
         }
       }
@@ -684,7 +696,6 @@ std::vector<OperatorDef> NetUtil::CollectGradientOps() {
     }
   }
   std::reverse(gradient_ops.begin(), gradient_ops.end());
-  std::cout << "reversing  ------------------" << std::endl;
   return gradient_ops;
 }
 
@@ -845,9 +856,8 @@ void NetUtil::Print() {
 }
 
 void NetUtil::SetDeviceCUDA() {
-#ifdef WITH_CUDA
   net_.mutable_device_option()->set_device_type(CUDA);
-#endif
+  net_.mutable_device_option()->set_cuda_gpu_id(2);
 }
 
 OperatorDef* NetUtil::AddRecurrentNetworkOp(const std::string& seq_lengths,
