@@ -280,12 +280,20 @@ def TranslateConv(layer, pretrained_blobs, is_test):
     # weight
     params = [
         utils.NumpyArrayToCaffe2Tensor(pretrained_blobs[0], output + '_w')]
+    print pretrained_blobs[0].dtype
     # bias
     if len(pretrained_blobs) == 2:
         caffe_op.input.append(output + '_b')
         params.append(
             utils.NumpyArrayToCaffe2Tensor(
                 pretrained_blobs[1].flatten(), output + '_b'))
+    elif len(pretrained_blobs) == 1:
+        caffe_op.input.append(output + '_b')
+        filter_shape = pretrained_blobs[0].shape
+        temp_blob = np.zeros(filter_shape[0], dtype=np.float32).flatten()
+        print temp_blob.dtype
+        params.append(
+                utils.NumpyArrayToCaffe2Tensor(temp_blob, output + '_b'))
     # Group convolution option
     if param.group != 1:
         AddArgument(caffe_op, "group", param.group)
@@ -321,8 +329,14 @@ def TranslateDeconv(layer, pretrained_blobs, is_test):
 
 @TranslatorRegistry.Register("ReLU")
 def TranslateRelu(layer, pretrained_blobs, is_test):
-    return BaseTranslate(layer, "Relu"), []
-
+    caffe_op = BaseTranslate(layer, "Relu")
+    if hasattr(layer, "relu_param"):
+        print "leakyRelu"
+        relu_param = layer.relu_param
+        if hasattr(relu_param, "negative_slope"):
+            caffe_op = BaseTranslate(layer, "LeakyRelu")
+            AddArgument(caffe_op, "alpha", relu_param.negative_slope)
+    return caffe_op, []
 
 @TranslatorRegistry.Register("Pooling")
 def TranslatePool(layer, pretrained_blobs, is_test):
@@ -613,6 +627,24 @@ def TranslateReshape(layer, pretrained_blobs, is_test):
     caffe_op.output.append("_" + caffe_op.input[0] + "_dims")
     reshape_param = layer.reshape_param
     AddArgument(caffe_op, 'shape', reshape_param.shape.dim)
+    return caffe_op, []
+
+@TranslatorRegistry.Register("Reorg")
+def TranslateReorg(layer, pretrained_blobs, is_test):
+    caffe_op = BaseTranslate(layer, "Reorg")
+    reorg_param = layer.reorg_param
+    AddArgument(caffe_op, 'stride', reorg_param.stride)
+    AddArgument(caffe_op, 'reverse', reorg_param.reverse)
+    return caffe_op, []
+
+@TranslatorRegistry.Register("Region")
+def TranslateRegion(layer, pretrained_blobs, is_test):
+    caffe_op = BaseTranslate(layer, "Region")
+    region_param = layer.region_param
+    AddArgument(caffe_op, 'classes', region_param.classes)
+    AddArgument(caffe_op, 'coords', region_param.coords)
+    AddArgument(caffe_op, 'softmax', region_param.softmax)
+    AddArgument(caffe_op, 'boxes_of_each_grid', region_param.boxes_of_each_grid)
     return caffe_op, []
 
 

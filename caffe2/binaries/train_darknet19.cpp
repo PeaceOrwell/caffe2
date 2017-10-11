@@ -71,7 +71,7 @@ void run() {
   }
 
   auto predictNet = CreateNet(predict_net, &workspace);
-  int epoch = 1, iteration = 10;
+  int epoch = 10, iteration = 5000;
   for (auto i = 0; i < epoch; ++i) {
     LOG(INFO) << "start the " << i << "th epoch forward";
     for (auto j = 0; j < iteration; ++j) {
@@ -82,8 +82,8 @@ void run() {
       print(Tensor<CPUContext>((workspace.GetBlob("lr"))->template Get<Tensor<CUDAContext>>()));
       std::cout << std::endl;
     }
-    dump(i * iteration, predict_net, &workspace);
   }
+  dump(epoch * iteration, predict_net, &workspace);
   LOG(INFO) << "Net param is inited down!";
 }
 
