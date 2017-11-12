@@ -51,14 +51,14 @@ cmake .. \
     -DCMAKE_INSTALL_PREFIX=../install \
     -DANDROID_NDK=$ANDROID_NDK \
     -DCMAKE_BUILD_TYPE=Release \
-    -DANDROID_ABI="armeabi-v7a with NEON" \
+    -DANDROID_ABI="armeabi-v7a with NEON FP16" \
     -DANDROID_NATIVE_API_LEVEL=21 \
     -DUSE_CUDA=OFF \
     -DBUILD_TEST=OFF \
     -DUSE_LMDB=OFF \
     -DUSE_LEVELDB=OFF \
     -DBUILD_PYTHON=OFF \
-    -DPROTOBUF_PROTOC_EXECUTABLE=$CAFFE2_ROOT/build_host_protoc/bin/protoc \
+    -DCAFFE2_CUSTOM_PROTOC_EXECUTABLE=$CAFFE2_ROOT/build_host_protoc/bin/protoc \
     -DCMAKE_VERBOSE_MAKEFILE=1 \
     -DUSE_MPI=OFF \
     -DUSE_OPENMP=OFF \

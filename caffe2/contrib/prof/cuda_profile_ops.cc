@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "caffe2/core/common_gpu.h"
 #include "caffe2/core/operator.h"
 
@@ -7,7 +23,6 @@
 #include <cuda_profiler_api.h>
 
 namespace caffe2 {
-namespace {
 
 static std::vector<std::string> kCudaProfileConfiguration = {
     "gpustarttimestamp",
@@ -56,7 +71,7 @@ class CudaProfileInitializeOp : public OperatorBase {
     unlink(config_.c_str());
   }
 
-  virtual bool Run(int /* unused */ stream_id = 0) {
+  virtual bool Run(int /* unused */ /*stream_id*/ = 0) {
     // If this fails, check the contents of "output" for hints.
     CUDA_CHECK(
         cudaProfilerInitialize(config_.c_str(), output_.c_str(), cudaCSV));
@@ -73,7 +88,7 @@ class CudaProfileStartOp : public OperatorBase {
   CudaProfileStartOp(const OperatorDef& operator_def, Workspace* ws)
       : OperatorBase(operator_def, ws) {}
 
-  virtual bool Run(int /* unused */ stream_id = 0) {
+  virtual bool Run(int /* unused */ /*stream_id*/ = 0) {
     CUDA_ENFORCE(cudaProfilerStart());
     return true;
   }
@@ -84,11 +99,15 @@ class CudaProfileStopOp : public OperatorBase {
   CudaProfileStopOp(const OperatorDef& operator_def, Workspace* ws)
       : OperatorBase(operator_def, ws) {}
 
-  virtual bool Run(int /* unused */ stream_id = 0) {
+  virtual bool Run(int /* unused */ /*stream_id*/ = 0) {
     CUDA_ENFORCE(cudaProfilerStop());
     return true;
   }
 };
+
+OPERATOR_SCHEMA(CudaProfileInitialize);
+OPERATOR_SCHEMA(CudaProfileStart);
+OPERATOR_SCHEMA(CudaProfileStop);
 
 REGISTER_CPU_OPERATOR(CudaProfileInitialize, CudaProfileInitializeOp);
 REGISTER_CPU_OPERATOR(CudaProfileStart, CudaProfileStartOp);
@@ -98,5 +117,4 @@ REGISTER_CUDA_OPERATOR(CudaProfileInitialize, CudaProfileInitializeOp);
 REGISTER_CUDA_OPERATOR(CudaProfileStart, CudaProfileStartOp);
 REGISTER_CUDA_OPERATOR(CudaProfileStop, CudaProfileStopOp);
 
-} // namespace
 } // namespace caffe2

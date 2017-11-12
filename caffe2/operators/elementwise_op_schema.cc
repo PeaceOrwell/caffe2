@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "caffe2/core/operator_gradient.h"
 #include "caffe2/operators/elementwise_op.h"
 #include "caffe2/utils/proto_utils.h"
@@ -52,24 +68,28 @@ OPERATOR_SCHEMA(Add)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{0, 0}, {1, 0}})
+    .CostInferenceFunction(PointwiseCostInference<1>)
     .IdenticalTypeAndShapeOfInput(0)
     .FillUsing(MathDocGenerator("addition"));
 OPERATOR_SCHEMA(Sub)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{0, 0}, {1, 0}})
+    .CostInferenceFunction(PointwiseCostInference<1>)
     .IdenticalTypeAndShapeOfInput(0)
     .FillUsing(MathDocGenerator("subtraction"));
 OPERATOR_SCHEMA(Mul)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{0, 0}, {1, 0}})
+    .CostInferenceFunction(PointwiseCostInference<1>)
     .IdenticalTypeAndShapeOfInput(0)
     .FillUsing(MathDocGenerator("multiplication"));
 OPERATOR_SCHEMA(Div)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{0, 0}})
+    .CostInferenceFunction(PointwiseCostInference<1>)
     .IdenticalTypeAndShapeOfInput(0)
     .FillUsing(MathDocGenerator("division"));
 OPERATOR_SCHEMA(DivGradient).NumInputs(3).NumOutputs(2).AllowInplace({{0, 0}});
@@ -115,7 +135,7 @@ For example, the following tensor shapes are supported:
 class GetAddGradient : public GradientMakerBase {
   using GradientMakerBase::GradientMakerBase;
   vector<OperatorDef> GetGradientDefs() override {
-    if (!HasArgument(Def(), "broadcast")) {
+    if (!ArgumentHelper::HasArgument(Def(), "broadcast")) {
       SetDense(0, GO(0));
       SetDense(1, GO(0));
       return vector<OperatorDef>();
@@ -136,7 +156,7 @@ REGISTER_GRADIENT(Add, GetAddGradient);
 class GetSubGradient : public GradientMakerBase {
   using GradientMakerBase::GradientMakerBase;
   vector<OperatorDef> GetGradientDefs() override {
-    if (!HasArgument(Def(), "broadcast")) {
+    if (!ArgumentHelper::HasArgument(Def(), "broadcast")) {
       SetDense(0, GO(0));
       return SingleGradientDef(
           "Negative", "", vector<string>{GO(0)}, vector<string>{GI(1)});
@@ -150,17 +170,17 @@ class GetSubGradient : public GradientMakerBase {
           vector<string>{GI(1) + "_autogen_pre_red"}));
 
       Argument axis, axis_str, order;
-      if (HasArgument(Def(), "axis")) {
+      if (ArgumentHelper::HasArgument(Def(), "axis")) {
         axis = GetArgument(Def(), "axis");
       } else {
         axis = MakeArgument<int>("axis", -1);
       }
-      if (HasArgument(Def(), "axis_str")) {
+      if (ArgumentHelper::HasArgument(Def(), "axis_str")) {
         axis_str = GetArgument(Def(), "axis_str");
       } else {
         axis_str = MakeArgument<string>("axis_str", "");
       }
-      if (HasArgument(Def(), "order")) {
+      if (ArgumentHelper::HasArgument(Def(), "order")) {
         order = GetArgument(Def(), "order");
       } else {
         order = MakeArgument<string>("order", "NCHW");
@@ -190,7 +210,7 @@ class GetMulGradient : public GradientMakerBase {
         "Gradient computation cannot be carried out if Mul uses in-place "
         "computation: ",
         ProtoDebugString(Def()));
-    if (!HasArgument(Def(), "broadcast")) {
+    if (!ArgumentHelper::HasArgument(Def(), "broadcast")) {
       return vector<OperatorDef>{
           CreateOperatorDef(
               "Mul", "", vector<string>{GO(0), I(1)}, vector<string>{GI(0)}),
@@ -198,22 +218,22 @@ class GetMulGradient : public GradientMakerBase {
               "Mul", "", vector<string>{GO(0), I(0)}, vector<string>{GI(1)})};
     } else {
       Argument broadcast, axis, axis_str, order;
-      if (HasArgument(Def(), "broadcast")) {
+      if (ArgumentHelper::HasArgument(Def(), "broadcast")) {
         broadcast = GetArgument(Def(), "broadcast");
       } else {
         broadcast = MakeArgument<int>("broadcast", 0);
       }
-      if (HasArgument(Def(), "axis")) {
+      if (ArgumentHelper::HasArgument(Def(), "axis")) {
         axis = GetArgument(Def(), "axis");
       } else {
         axis = MakeArgument<int>("axis", -1);
       }
-      if (HasArgument(Def(), "axis_str")) {
+      if (ArgumentHelper::HasArgument(Def(), "axis_str")) {
         axis_str = GetArgument(Def(), "axis_str");
       } else {
         axis_str = MakeArgument<string>("axis_str", "");
       }
-      if (HasArgument(Def(), "order")) {
+      if (ArgumentHelper::HasArgument(Def(), "order")) {
         order = GetArgument(Def(), "order");
       } else {
         order = MakeArgument<string>("order", "NCHW");
@@ -254,7 +274,7 @@ class GetDivGradient : public GradientMakerBase {
   using GradientMakerBase::GradientMakerBase;
   vector<OperatorDef> GetGradientDefs() override {
     CAFFE_ENFORCE(
-        !HasArgument(Def(), "broadcast"),
+        !ArgumentHelper::HasArgument(Def(), "broadcast"),
         "Gradient not ready yet for Div with broadcasting.");
     return SingleGradientDef(
         "DivGradient",

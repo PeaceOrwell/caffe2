@@ -35,6 +35,7 @@ cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DIOS_PLATFORM=${IOS_PLATFORM} \
     -DUSE_CUDA=OFF \
+    -DUSE_OPENCV=OFF \
     -DBUILD_TEST=OFF \
     -DBUILD_BINARY=OFF \
     -DCMAKE_C_FLAGS=-fembed-bitcode \
@@ -42,7 +43,7 @@ cmake .. \
     -DUSE_LMDB=OFF \
     -DUSE_LEVELDB=OFF \
     -DBUILD_PYTHON=OFF \
-    -DPROTOBUF_PROTOC_EXECUTABLE=$CAFFE2_ROOT/build_host_protoc/bin/protoc \
+    -DCAFFE2_CUSTOM_PROTOC_EXECUTABLE=$CAFFE2_ROOT/build_host_protoc/bin/protoc \
     -DCMAKE_VERBOSE_MAKEFILE=1 \
     -DUSE_MPI=OFF \
     -DBUILD_SHARED_LIBS=OFF \

@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef CAFFE2_OPERATORS_DATASET_OPS_H_
 #define CAFFE2_OPERATORS_DATASET_OPS_H_
 
@@ -70,6 +86,10 @@ class TreeIterator {
     return fields_;
   }
 
+  const std::vector<int>& lengthFieldIds() const {
+    return lengthFieldIds_;
+  }
+
  private:
   // Description of each field
   std::vector<FieldDesc> fields_;
@@ -133,12 +153,28 @@ class TreeWalker {
       return walker_.fieldDim(fieldId_);
     }
 
+    inline TIndex size() const {
+      TIndex size = 1;
+      for (const auto d : dim()) {
+        size *= d;
+      }
+      return size;
+    }
+
     inline const TypeMeta& meta() const {
       return walker_.input(fieldId_).meta();
     }
 
     inline void* ptr() const {
       return walker_.fieldPtr(fieldId_);
+    }
+
+    int fieldId() const {
+      return fieldId_;
+    }
+
+    inline TOffset offset() const {
+      return walker_.offset(fieldId_);
     }
 
    private:

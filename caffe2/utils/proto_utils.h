@@ -1,14 +1,30 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef CAFFE2_UTILS_PROTO_UTILS_H_
 #define CAFFE2_UTILS_PROTO_UTILS_H_
 
-#include "google/protobuf/message_lite.h"
-#ifndef CAFFE2_USE_LITE_PROTO
-#include "google/protobuf/message.h"
+#ifdef CAFFE2_USE_LITE_PROTO
+#include <google/protobuf/message_lite.h>
+#else // CAFFE2_USE_LITE_PROTO
+#include <google/protobuf/message.h>
 #endif  // !CAFFE2_USE_LITE_PROTO
 
 #include "caffe2/core/logging.h"
 #include "caffe2/proto/caffe2.pb.h"
-#include "caffe2/proto/predictor_consts.pb.h"
 
 namespace caffe2 {
 
@@ -23,6 +39,9 @@ using ::google::protobuf::MessageLite;
 // protobuf-full, and some platforms (like mobile) may want to use
 // protobuf-lite instead.
 std::string DeviceTypeName(const int32_t& d);
+
+// Returns if the two DeviceOptions are pointing to the same device.
+bool IsSameDevice(const DeviceOption& lhs, const DeviceOption& rhs);
 
 // Common interfaces that reads file contents into a string.
 bool ReadStringFromFile(const char* filename, string* str);
@@ -49,7 +68,9 @@ inline string ProtoDebugString(const MessageLite& proto) {
 // Text format MessageLite wrappers: these functions do nothing but just
 // allowing things to compile. It will produce a runtime error if you are using
 // MessageLite but still want text support.
-inline bool ReadProtoFromTextFile(const char* filename, MessageLite* proto) {
+inline bool ReadProtoFromTextFile(
+    const char* /*filename*/,
+    MessageLite* /*proto*/) {
   LOG(FATAL) << "If you are running lite version, you should not be "
                   << "calling any text-format protobuffers.";
   return false;  // Just to suppress compiler warning.
@@ -58,8 +79,9 @@ inline bool ReadProtoFromTextFile(const string filename, MessageLite* proto) {
   return ReadProtoFromTextFile(filename.c_str(), proto);
 }
 
-inline void WriteProtoToTextFile(const MessageLite& proto,
-                                 const char* filename) {
+inline void WriteProtoToTextFile(
+    const MessageLite& /*proto*/,
+    const char* /*filename*/) {
   LOG(FATAL) << "If you are running lite version, you should not be "
                   << "calling any text-format protobuffers.";
 }
@@ -162,15 +184,8 @@ inline OperatorDef CreateOperatorDef(
       engine);
 }
 
-
-inline bool HasArgument(const OperatorDef& def, const string& name) {
-  for (const Argument& arg : def.arg()) {
-    if (arg.name() == name) {
-      return true;
-    }
-  }
-  return false;
-}
+bool HasOutput(const OperatorDef& op, const std::string& output);
+bool HasInput(const OperatorDef& op, const std::string& input);
 
 /**
  * @brief A helper class to index into arguments.
@@ -182,6 +197,44 @@ inline bool HasArgument(const OperatorDef& def, const string& name) {
  */
 class ArgumentHelper {
  public:
+  template <typename Def>
+  static bool HasArgument(const Def& def, const string& name) {
+    return ArgumentHelper(def).HasArgument(name);
+  }
+
+  template <typename Def, typename T>
+  static T GetSingleArgument(
+      const Def& def,
+      const string& name,
+      const T& default_value) {
+    return ArgumentHelper(def).GetSingleArgument<T>(name, default_value);
+  }
+
+  template <typename Def, typename T>
+  static bool HasSingleArgumentOfType(const Def& def, const string& name) {
+    return ArgumentHelper(def).HasSingleArgumentOfType<T>(name);
+  }
+
+  template <typename Def, typename T>
+  static vector<T> GetRepeatedArgument(
+      const Def& def,
+      const string& name,
+      const std::vector<T>& default_value = std::vector<T>()) {
+    return ArgumentHelper(def).GetRepeatedArgument<T>(name, default_value);
+  }
+
+  template <typename Def, typename MessageType>
+  static MessageType GetMessageArgument(const Def& def, const string& name) {
+    return ArgumentHelper(def).GetMessageArgument<MessageType>(name);
+  }
+
+  template <typename Def, typename MessageType>
+  static vector<MessageType> GetRepeatedMessageArgument(
+      const Def& def,
+      const string& name) {
+    return ArgumentHelper(def).GetRepeatedMessageArgument<MessageType>(name);
+  }
+
   explicit ArgumentHelper(const OperatorDef& def);
   explicit ArgumentHelper(const NetDef& netdef);
   bool HasArgument(const string& name) const;
@@ -244,6 +297,23 @@ inline void AddArgument(const string& name, const T& value, OperatorDef* def) {
   GetMutableArgument(name, true, def)->CopyFrom(MakeArgument(name, value));
 }
 
-}  // namespace caffe2
+bool inline operator==(const DeviceOption& dl, const DeviceOption& dr) {
+  return IsSameDevice(dl, dr);
+}
 
-#endif  // CAFFE2_UTILS_PROTO_UTILS_H_
+} // namespace caffe2
+
+namespace std {
+template <>
+struct hash<caffe2::DeviceOption> {
+  typedef caffe2::DeviceOption argument_type;
+  typedef std::size_t result_type;
+  result_type operator()(argument_type const& device_option) const {
+    std::string serialized;
+    CAFFE_ENFORCE(device_option.SerializeToString(&serialized));
+    return std::hash<std::string>{}(serialized);
+  }
+};
+} // namespace std
+
+#endif // CAFFE2_UTILS_PROTO_UTILS_H_

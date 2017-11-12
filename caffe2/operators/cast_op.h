@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
 
 #include "caffe2/core/context.h"
@@ -17,8 +33,9 @@ class CastOp : public Operator<Context> {
 
   CastOp(const OperatorDef& operator_def, Workspace* ws)
       : Operator<Context>(operator_def, ws) {
-    TensorProto_DataType to = cast::GetCastDataType(this->arg_helper(), "to");
-    TensorProto_DataType from = cast::GetCastDataType(this->arg_helper(), "from_type");
+    const ArgumentHelper helper(operator_def);
+    TensorProto_DataType to = cast::GetCastDataType(helper, "to");
+    TensorProto_DataType from = cast::GetCastDataType(helper, "from_type");
 
     SetBody(to);
   }

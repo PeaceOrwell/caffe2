@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef CAFFE2_CORE_OPERATOR_H_
 #define CAFFE2_CORE_OPERATOR_H_
 
@@ -22,7 +38,10 @@
 
 namespace caffe2 {
 
-class OperatorBase {
+class OperatorBase;
+typedef ObserverBase<OperatorBase> OperatorObserver;
+
+class OperatorBase : public Observable<OperatorBase> {
  public:
   explicit OperatorBase(const OperatorDef& operator_def, Workspace* ws);
   virtual ~OperatorBase() noexcept {}
@@ -30,24 +49,31 @@ class OperatorBase {
   /** @brief Checks if the operator has an argument of the given name.
    */
   inline bool HasArgument(const string& name) const {
-    return arg_helper_.HasArgument(name);
+    CAFFE_ENFORCE(operator_def_, "operator_def was null!");
+    return ArgumentHelper::HasArgument(*operator_def_, name);
   }
 
   // Functions that deal with arguments. Basically, this allows us to map an
   // argument name to a specific type of argument that we are trying to access.
   template <typename T>
   inline T GetSingleArgument(const string& name, const T& default_value) const {
-    return arg_helper_.template GetSingleArgument<T>(name, default_value);
+    CAFFE_ENFORCE(operator_def_, "operator_def was null!");
+    return ArgumentHelper::GetSingleArgument<OperatorDef, T>(
+        *operator_def_, name, default_value);
   }
   template <typename T>
   inline bool HasSingleArgumentOfType(const string& name) const {
-    return arg_helper_.template HasSingleArgumentOfType<T>(name);
+    CAFFE_ENFORCE(operator_def_, "operator_def was null!");
+    return ArgumentHelper::HasSingleArgumentOfType<OperatorDef, T>(
+        *operator_def_, name);
   }
   template <typename T>
   inline vector<T> GetRepeatedArgument(
       const string& name,
       const vector<T>& default_value = {}) const {
-    return arg_helper_.template GetRepeatedArgument<T>(name, default_value);
+    CAFFE_ENFORCE(operator_def_, "operator_def was null!");
+    return ArgumentHelper::GetRepeatedArgument<OperatorDef, T>(
+        *operator_def_, name, default_value);
   }
 
   // Get the inputs and outputs as specific types.
@@ -93,12 +119,47 @@ class OperatorBase {
   inline int OutputSize() { return outputs_.size(); }
   inline const vector<const Blob*>& Inputs() const { return inputs_; }
   inline const vector<Blob*>& Outputs() { return outputs_; }
+  vector<TensorShape> InputTensorShapes();
 
-  virtual bool Run(int /* unused */ stream_id = 0) {
+  virtual void WaitEvent(const Event& ev, int stream_id = -1) {
+    ev.Finish();
+  }
+
+  inline void Wait(const OperatorBase& other, int stream_id = -1) {
+    WaitEvent(other.event(), stream_id);
+  }
+
+  virtual void WaitEvents(
+      const std::vector<const Event*>& events,
+      int stream_id = -1) {
+    for (const auto& ev : events) {
+      ev->Finish();
+    }
+  }
+
+  virtual void Finish() {
+    if (event_) {
+      event_->Finish();
+    }
+  }
+
+  virtual bool Run(int /* unused */ /*stream_id*/ = 0) {
     CAFFE_NOT_IMPLEMENTED;
   }
 
-  virtual bool RunAsync(int /* unused */ stream_id = 0) {
+  virtual bool HasAsyncPart() const {
+    return false;
+  }
+
+  virtual bool SupportsAsyncScheduling() const {
+    return false;
+  }
+
+  // RunAsync, if implemenented by the specific operators, will schedule the
+  // computation on the corresponding context and record the event in its
+  // event_ member object. If the specific operator does not support RunAsync,
+  // it will simply be synchronous as a fallback.
+  virtual bool RunAsync(int stream_id = 0) {
     return Run(stream_id);
   }
 
@@ -132,30 +193,19 @@ class OperatorBase {
 
   inline const OperatorDef& debug_def() const {
     CAFFE_ENFORCE(has_debug_def(), "operator_def was null!");
-    return *operator_debug_def_;
+    return *operator_def_;
   }
 
-  inline void set_debug_def(std::shared_ptr<const OperatorDef>& operator_def) {
-    operator_debug_def_ = operator_def;
+  inline void set_debug_def(
+      const std::shared_ptr<const OperatorDef>& operator_def) {
+    operator_def_ = operator_def;
   }
 
   inline bool has_debug_def() const {
-    return operator_debug_def_ != nullptr;
-  }
-
-  inline const ArgumentHelper& arg_helper() const {
-    return arg_helper_;
+    return operator_def_ != nullptr;
   }
 
  public:
-  void SetObserver(std::unique_ptr<ObserverBase<OperatorBase>> observer) {
-    observer_ = std::move(observer);
-  }
-
-  void RemoveObserver() {
-    observer_ = nullptr;
-  }
-
   void RecordLastFailedOpNetPosition() {
     if (net_position_ != kNoNetPositionSet) {
       VLOG(1) << "Operator with id " << net_position_ << " failed";
@@ -177,25 +227,63 @@ class OperatorBase {
     return device_option_;
   }
 
+  const Event& event() const {
+    CAFFE_ENFORCE(event_, "Event is disabled");
+    return *event_;
+  }
+
+  Event& event() {
+    CAFFE_ENFORCE(event_, "Event is disabled");
+    return *event_;
+  }
+
+  void ResetEvent() {
+    if (event_) {
+      event_->Reset();
+    }
+  }
+
+  void DisableEvent() {
+    event_ = nullptr;
+  }
+
+  bool IsEventDisabled() const {
+    return !event_;
+  }
+
+  const std::string& type() {
+    CAFFE_ENFORCE(operator_def_.get() != nullptr);
+    return operator_def_->type();
+  }
+
+  void annotate_engine(const std::string& engine) {
+    engine_ = engine;
+  }
+
+  const std::string& engine() const {
+    return engine_;
+  }
+
  public:
   static constexpr int kNoNetPositionSet = -1;
 
-  ObserverBase<OperatorBase>* GetObserver() {
-    return observer_.get();
-  }
-
- protected:
-  Workspace* operator_ws_;
-  std::unique_ptr<ObserverBase<OperatorBase>> observer_;
-
  private:
-  std::shared_ptr<const OperatorDef> operator_debug_def_;
+  Workspace* operator_ws_;
+  std::shared_ptr<const OperatorDef> operator_def_;
   DeviceOption device_option_;
-  ArgumentHelper arg_helper_;
+  std::string engine_;
   vector<const Blob*> inputs_;
   vector<Blob*> outputs_;
 
   int net_position_{kNoNetPositionSet};
+
+ protected:
+  virtual void RecordEvent(const char* err_msg = nullptr) {
+    CAFFE_NOT_IMPLEMENTED;
+  }
+
+  // An event used by asynchronous execution.
+  std::unique_ptr<Event> event_;
 
   DISABLE_COPY_AND_ASSIGN(OperatorBase);
 };
@@ -227,7 +315,6 @@ class OperatorBase {
 #define OUTPUT_TAGS(first_input, ...)                                          \
   enum _OutputTags { first_input = 0, __VA_ARGS__ }
 
-
 // Operator is the class that you usually want to derive, if your operator will
 // run on different devices. You should then implement the RunOnDevice()
 // function.
@@ -235,8 +322,7 @@ template <class Context>
 class Operator : public OperatorBase {
  public:
   explicit Operator(const OperatorDef& operator_def, Workspace* ws)
-      : OperatorBase(operator_def, ws),
-        context_(operator_def.device_option()) {
+      : OperatorBase(operator_def, ws), context_(operator_def.device_option()) {
     // In the constructor, we switch to the device so that the child class
     // constructors will run on that device.
     context_.SwitchToDevice(0);
@@ -244,40 +330,47 @@ class Operator : public OperatorBase {
   ~Operator() noexcept override {}
 
   inline const Tensor<Context>& Input(int idx) {
-    return OperatorBase::template Input<Tensor<Context> >(idx); }
+    return OperatorBase::template Input<Tensor<Context>>(idx);
+  }
   inline Tensor<Context>* Output(int idx) {
     return OperatorBase::template Output<Tensor<Context>>(idx);
+  }
+
+  void WaitEvent(const Event& ev, int stream_id = -1) final {
+    if (stream_id >= 0) {
+      context_.SwitchToDevice(stream_id);
+    }
+    context_.WaitEvent(ev);
+  }
+
+  void WaitEvents(const std::vector<const Event*>& events, int stream_id = -1)
+      final {
+    if (stream_id >= 0) {
+      context_.SwitchToDevice(stream_id);
+    }
+    for (const auto& ev : events) {
+      context_.WaitEvent(*ev);
+    }
   }
 
   // The run function of Operator switches to the device, and then carries out
   // the actual computation with RunOnDevice(). You should implement RunOnDevice
   // instead of Run().
+  // Note: Run does not update operator's event and can be used only with
+  // non-async executors that do not rely on events
   bool Run(int stream_id = 0) final {
     try {
-      if (observer_) {
-        observer_->Start();
-      }
+      StartAllObservers();
+
       context_.SwitchToDevice(stream_id);
-      bool started = RunOnDevice();
-      bool finished = context_.FinishDeviceComputation();
-      auto result = started && finished;
+      bool result = RunOnDevice();
       if (!result) {
         this->RecordLastFailedOpNetPosition();
       }
-      if (!finished) {
-        // FinishDeviceComputation() returning error basically means that there
-        // is something wrong with the device (like CUDA) that usually cannot be
-        // recovered, so we should log FATAL.
-        if (has_debug_def()) {
-          LOG(FATAL) << "Computation on device returned error in operator\n"
-                     << ProtoDebugString(this->debug_def());
-        } else {
-          LOG(FATAL) << "Computation on device returned error in operator";
-        }
-      }
-      if (observer_) {
-        observer_->Stop();
-      }
+      context_.FinishDeviceComputation(); // throws on error
+
+      StopAllObservers();
+
       return result;
     } catch (EnforceNotMet& err) {
       if (has_debug_def()) {
@@ -297,7 +390,16 @@ class Operator : public OperatorBase {
     try {
       context_.SwitchToDevice(stream_id);
       auto result = RunOnDevice();
-      if (!result) {
+      if (result) {
+        if (HasAsyncPart()) {
+          RecordEvent();
+        } else {
+          // Manually set CPU operator's event status to finished,
+          // unless this is an async CPU operator
+          event().SetFinished();
+        }
+      } else {
+        RecordEvent(getErrorMsg().c_str());
         this->RecordLastFailedOpNetPosition();
       }
       return result;
@@ -307,9 +409,11 @@ class Operator : public OperatorBase {
             "Error from operator: \n" + ProtoDebugString(debug_def()));
         AddRelatedBlobInfo(&err);
       }
+      RecordEvent(err.what());
       this->RecordLastFailedOpNetPosition();
       throw;
     } catch (...) {
+      RecordEvent(getErrorMsg().c_str());
       this->RecordLastFailedOpNetPosition();
       throw;
     }
@@ -317,7 +421,49 @@ class Operator : public OperatorBase {
 
   virtual bool RunOnDevice() = 0;
 
+  // Returns whether operator has async on device part.
+  // CUDA operators by default have async parts, CPU operators by default
+  // don't have async parts and are finished after RunOnDevice call.
+  // Events of operators that don't have async parts are automatically set
+  // to finished state by RunAsync.
+  // Defaulting to the value from context (true for CUDA, false for CPU).
+  // Override in case of async CPU operators
+  bool HasAsyncPart() const override {
+    return context_.HasAsyncPartDefault();
+  }
+
+  // Returns whether operator's RunOnDevice schedules async on device part and
+  // can be run without waiting for parent operator's async part to be finished
+  // on the same device.
+  // Note: when true, RunOnDevice must not access the content of the input blobs
+  // as they might not be computed yet
+  // Note: when true, operator's device needs to support async scheduling:
+  //  - supports concept of streams: async ops scheduled on the same stream are
+  //    guaranteed to be executed in the same order they were scheduled
+  //  - provides non-blocking cross device/cross stream synchronization
+  //    primitives
+  //
+  // By default, assuming an op with an async part can be scheduled
+  // asynchronously if device supports async scheduling
+  bool SupportsAsyncScheduling() const override {
+    return HasAsyncPart() && context_.SupportsAsyncScheduling();
+  }
+
  protected:
+  void RecordEvent(const char* err_msg = nullptr) final {
+    if (event_) {
+      context_.Record(event_.get(), err_msg);
+    }
+  }
+
+  std::string getErrorMsg() {
+    if (has_debug_def()) {
+      return "Error from operator: " + ProtoDebugString(debug_def());
+    } else {
+      return "Error from operator: no op def";
+    }
+  }
+
   Context context_;
 };
 
@@ -411,7 +557,7 @@ struct DispatchHelper<FixedValues<FirstVal, Values...>, ExtraArgs...> {
 template <typename... ExtraArgs>
 struct DispatchHelper<FixedValues<>, ExtraArgs...> {
   template <typename Op>
-  static bool call(Op* op, TIndex size) {
+  static bool call(Op* op, TIndex /*size*/) {
     return op->template DoRunWithValue<ExtraArgs..., -1>();
   }
 };
@@ -489,10 +635,17 @@ CAFFE2_DEFINE_TENSOR_TYPES_DISPATCHER(
 //     registry function.
 // (2) Then, one can call the operator registry function to further create the
 //     operators.
-typedef Registry<std::string, OperatorBase, const OperatorDef&, Workspace*>
+typedef Registry<
+    std::string,
+    std::unique_ptr<OperatorBase>,
+    const OperatorDef&,
+    Workspace*>
     OperatorRegistry;
-typedef Registry<std::string, OperatorBase, const OperatorDef&, Workspace*>* (
-    *RegistryFunction)();
+typedef Registry<
+    std::string,
+    std::unique_ptr<OperatorBase>,
+    const OperatorDef&,
+    Workspace*>* (*RegistryFunction)();
 std::map<int32_t, OperatorRegistry*>* gDeviceTypeRegistry();
 
 struct DeviceTypeRegisterer {
@@ -528,7 +681,11 @@ CAFFE_DECLARE_REGISTRY(
     Workspace*);
 #define REGISTER_CPU_OPERATOR_CREATOR(key, ...) \
   CAFFE_REGISTER_CREATOR(CPUOperatorRegistry, key, __VA_ARGS__)
-#define REGISTER_CPU_OPERATOR(name, ...) \
+#define REGISTER_CPU_OPERATOR(name, ...)                           \
+  extern void CAFFE2_PLEASE_ADD_OPERATOR_SCHEMA_FOR_##name();      \
+  static void CAFFE2_UNUSED CAFFE_ANONYMOUS_VARIABLE_CPU##name() { \
+    CAFFE2_PLEASE_ADD_OPERATOR_SCHEMA_FOR_##name();                \
+  }                                                                \
   CAFFE_REGISTER_CLASS(CPUOperatorRegistry, name, __VA_ARGS__)
 #define REGISTER_CPU_OPERATOR_STR(str_name, ...) \
   CAFFE_REGISTER_TYPED_CLASS(CPUOperatorRegistry, str_name, __VA_ARGS__)
@@ -543,7 +700,11 @@ CAFFE_DECLARE_REGISTRY(
     Workspace*);
 #define REGISTER_CUDA_OPERATOR_CREATOR(key, ...) \
   CAFFE_REGISTER_CREATOR(CUDAOperatorRegistry, key, __VA_ARGS__)
-#define REGISTER_CUDA_OPERATOR(name, ...) \
+#define REGISTER_CUDA_OPERATOR(name, ...)                           \
+  extern void CAFFE2_PLEASE_ADD_OPERATOR_SCHEMA_FOR_##name();       \
+  static void CAFFE2_UNUSED CAFFE_ANONYMOUS_VARIABLE_CUDA##name() { \
+    CAFFE2_PLEASE_ADD_OPERATOR_SCHEMA_FOR_##name();                 \
+  }                                                                 \
   CAFFE_REGISTER_CLASS(CUDAOperatorRegistry, name, __VA_ARGS__)
 #define REGISTER_CUDA_OPERATOR_STR(str_name, ...) \
   CAFFE_REGISTER_TYPED_CLASS(CUDAOperatorRegistry, str_name, __VA_ARGS__)
@@ -612,6 +773,29 @@ unique_ptr<OperatorBase> CreateOperator(
     const OperatorDef& operator_def,
     Workspace* ws,
     int net_position = OperatorBase::kNoNetPositionSet);
+
+const std::string OpRegistryKey(
+    const std::string& op_type,
+    const std::string& engine = "");
+
+// User can set the preferred engines as a list of engine names, in
+// descending order of preference.
+using EnginePrefType = std::vector<std::string>;
+// {device_type -> {operator_name -> EnginePrefType}}
+using PerOpEnginePrefType =
+    CaffeMap<int, CaffeMap<std::string, EnginePrefType>>;
+// {device_type -> EnginePrefType}
+using GlobalEnginePrefType = CaffeMap<int, EnginePrefType>;
+void SetPerOpEnginePref(const PerOpEnginePrefType& per_op_engine_pref);
+void SetGlobalEnginePref(const GlobalEnginePrefType& global_engine_pref);
+void SetEnginePref(
+    const PerOpEnginePrefType& per_op_engine_pref,
+    const GlobalEnginePrefType& global_engine_pref);
+void SetOpEnginePref(
+    const std::string& op_type,
+    const CaffeMap<int, EnginePrefType>& op_pref);
+
+TensorShape GetTensorShapeOfBlob(const Blob* b);
 
 TensorShapes InferBlobShapesAndTypesFromWorkspace(
     Workspace* ws,

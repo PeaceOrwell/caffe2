@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef CAFFE2_OPERATORS_FULLY_CONNECTED_OP_SPARSE_H_
 #define CAFFE2_OPERATORS_FULLY_CONNECTED_OP_SPARSE_H_
 
@@ -40,9 +56,13 @@ void Sparse_mm(const T* acsr, const int* ia, const int* ja,
 template<typename T, class Context>
 void trans_mat(const T* o, T* t, int m, int n, Context* context);
 
-template<>
-void trans_mat<float, CPUContext>(const float* o, float* t,
-                                  int m, int n, CPUContext* context){
+template <>
+void trans_mat<float, CPUContext>(
+    const float* o,
+    float* t,
+    int m,
+    int n,
+    CPUContext* /*context*/) {
   for(int i = 0; i < m; ++i){
     for(int j = 0; j < n; ++j){
       t[j*m+i]=o[i*n+j];
@@ -53,9 +73,16 @@ void trans_mat<float, CPUContext>(const float* o, float* t,
 // C = A(sparse) * B
 // No transpose;
 template <>
-void Sparse_mm<float, CPUContext>(const float* acsr,
-        const int* ia, const int* ja, int m, int k,
-        int n, const float* b, float* c, CPUContext* context){
+void Sparse_mm<float, CPUContext>(
+    const float* acsr,
+    const int* ia,
+    const int* ja,
+    int m,
+    int k,
+    int n,
+    const float* b,
+    float* c,
+    CPUContext* /*context*/) {
   float alpha = 1.0, beta = 0.;
   mkl_scsrmm("N", &m, &n, &k, &alpha, "GLNC",
              acsr, ja, ia, ia+1, b, &n, &beta, c, &n);

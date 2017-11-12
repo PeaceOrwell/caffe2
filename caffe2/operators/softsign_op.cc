@@ -1,3 +1,19 @@
+/**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "caffe2/operators/elementwise_op.h"
 #include "caffe2/utils/math.h"
 
@@ -6,7 +22,7 @@ namespace caffe2 {
 struct SoftsignCPUFunctor {
   template <typename T>
   inline void
-  operator()(const int n, const T* x, T* y, CPUContext* device_context) {
+  operator()(const int n, const T* x, T* y, CPUContext* /*device_context*/) {
     ConstEigenVectorArrayMap<T> x_arr(x, n);
     EigenVectorMap<T>(y, n) = (1 + x_arr.abs()).inverse() * x_arr;
   }
@@ -14,15 +30,18 @@ struct SoftsignCPUFunctor {
 
 struct SoftsignGradientCPUFunctor {
   template <typename T>
-  inline void
-  Run(const int n, const T* x, const T* dy, T* dx, CPUContext* device_context) {
+  inline void Run(
+      const int n,
+      const T* x,
+      const T* dy,
+      T* dx,
+      CPUContext* /*device_context*/) {
     ConstEigenVectorArrayMap<T> dy_arr(dy, n);
     ConstEigenVectorArrayMap<T> x_arr(x, n);
     EigenVectorMap<T>(dx, n) = dy_arr * (1 + x_arr.abs()).pow(2).inverse();
   }
 };
 
-namespace {
 REGISTER_CPU_OPERATOR(
     Softsign,
     UnaryElementwiseOp<TensorTypes<float>, CPUContext, SoftsignCPUFunctor>);
@@ -84,5 +103,4 @@ class GetSoftsignGradient : public GradientMakerBase {
 
 REGISTER_GRADIENT(Softsign, GetSoftsignGradient);
 
-} // namespace
 } // namespace caffe2
