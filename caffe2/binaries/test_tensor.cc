@@ -6,8 +6,8 @@
 
 using namespace std;
 using namespace Eigen;
-const int input_size = 3;
-const int filter_size = 2;
+const int input_size = 4;
+const int filter_size = 3;
 const int output_size = input_size -filter_size + 1;
 
 void print8(uint8_t* data_ptr, int total, int line_width, string name) {
@@ -21,24 +21,16 @@ void print8(uint8_t* data_ptr, int total, int line_width, string name) {
   return;
 }
 
-uint8_t bitcount(uint8_t a) {
-  uint8_t res = 0;
-  while (a != 0) {
-    a = a & (a -  1);
-    res++;
-  }
-  return res;
-}
-
+namespace Eigen {
 class xnor_uint8_t {
  public:
   uint8_t val;
   xnor_uint8_t() { val = 0; }
   xnor_uint8_t(uint8_t v) : val(v) {}
   xnor_uint8_t operator* (const xnor_uint8_t b) const {
-    //return bitcount(!(val^(b.val)));
-    std::cout << bitset<8>(val) << "  *  " << bitset<8>(b.val) << " = " << bitset<8>(bitcount(val^(b.val)))  << endl;
-    return bitcount(val^(b.val));
+    uint8_t res = (b.val == 0 ? (b.val ^ 1) : val);
+    std::cout << bitset<8>(val) << "  *  " << bitset<8>(b.val) << " = " << bitset<8>(res)  << endl;
+    return res;
   }
   xnor_uint8_t operator+ (const xnor_uint8_t b) const {
     return b.val + val;
@@ -49,7 +41,6 @@ class xnor_uint8_t {
   }
 };
 
-namespace Eigen {
 template<> struct NumTraits<xnor_uint8_t> {
   typedef uint8_t Nested;
   typedef uint8_t Real;
@@ -73,7 +64,7 @@ void test1() {
   uint8_t* filter_ptr = (uint8_t*)malloc(filter_size * filter_size * sizeof(uint8_t));
   uint8_t* output_ptr = (uint8_t*)malloc(output_size * output_size * sizeof(uint8_t));
   for (size_t i = 0; i < input_size * input_size; ++i) {
-    input_ptr[i] = 16 + i;
+    input_ptr[i] = i;
   }
   for (size_t i = 0; i < filter_size * filter_size; ++i) {
     filter_ptr[i] = i;
@@ -107,9 +98,9 @@ void test1() {
   pre_contract_dims[1] = filter_size * filter_size * 1;
   pre_contract_dims[0] = output_size * output_size / 1;
 
-  Eigen::DSizes<TensorIndex, 2> filter_dims;
+  Eigen::DSizes<TensorIndex, 1> filter_dims;
   filter_dims[0] = filter_size * filter_size;
-  filter_dims[1] = 1;
+  //filter_dims[1] = 1;
 
   Eigen::Tensor<xnor_uint8_t, 4, Eigen::RowMajor> Y_tensor(1, output_size, output_size, 1);
   Y_tensor = input_tensor
@@ -131,7 +122,38 @@ void test1() {
   print8(filter_ptr, filter_size * filter_size, filter_size, "filter_tensor");
   print8(output_ptr, output_size * output_size, output_size, "output_tensor");
 }
- int main() {
-  test1();
-  return 0;
- }
+void test2() {
+    std::cout << "===============test 2===============" << std::endl;
+    Eigen::Tensor<double, 3> tensor(2, 2, 2);
+    tensor.setValues({{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}});
+    Eigen::Tensor<double, 2> tensor2(2, 2);
+    tensor2.setValues({{1, 2}, {3, 4}});
+    Eigen::Tensor<double, 1> tensor1;
+
+    std::array<Eigen::IndexPair<int>, 2> product_dims;
+    product_dims[0] =  { IndexPair<int>(0, 0) };
+    product_dims[1] =  { IndexPair<int>(2, 1) };
+    auto vv = tensor.contract(tensor2, product_dims);
+    cerr<<" value: "<<vv<<endl;
+    tensor1 = vv;
+}
+void test3() {
+    std::cout << "===============test 3===============" << std::endl;
+    Eigen::Tensor<double, 2> tensor(2, 2);
+    tensor.setValues({{1, 2}, {3, 4}});
+    Eigen::Tensor<double, 2> tensor2(2, 2);
+    tensor2.setValues({{1, 2}, {3, 4}});
+
+    std::array<Eigen::IndexPair<int>, 1> product_dims;
+    product_dims[0] =  { IndexPair<int>(1, 1) };
+    //product_dims[1] =  { IndexPair<int>(0, 1) };
+    auto vv = tensor.contract(tensor2, product_dims);
+    cerr<<" value: "<<vv<<endl;
+}
+
+int main() {
+ test1();
+ test2();
+ test3();
+ return 0;
+} 
