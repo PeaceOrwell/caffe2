@@ -1,0 +1,2 @@
+yolo2_predict_net.pb https://pan.baidu.com/s/1o7ZZlTw
+yolo2_init_net.pb https://pan.baidu.com/s/1o8Bndvs
