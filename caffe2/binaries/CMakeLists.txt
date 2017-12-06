@@ -9,9 +9,11 @@ caffe2_binary_target("run_plan.cc")
 caffe2_binary_target("speed_benchmark.cc")
 caffe2_binary_target("split_db.cc")
 
+# --for yolo9000
 caffe2_binary_target("test_yolo2.cc")
 caffe2_binary_target("transfer_pb.cc")
 caffe2_binary_target("test_tensor.cc")
+caffe2_binary_target("train_yolo2.cc")
 
 if (USE_CUDA)
   caffe2_binary_target("inspect_gpus.cc")
